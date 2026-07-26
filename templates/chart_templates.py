@@ -1,3 +1,5 @@
+import re
+
 import plotly.graph_objects as go
 import plotly.express as px
 import numpy as np
@@ -77,18 +79,50 @@ def create_bar_chart(dataframe, column_name, chart_title):
     return fig
 
 
-def create_mbar_chart(df, column_name, option_list, bar_title):
-    # Extract the relevant column
-    column_data = df[column_name].dropna()
+def _option_pattern(option):
+    """Compile an option label into a pattern that only matches whole answers.
 
-    # Initialize counts dictionary
+    A plain substring test counts "No" inside "Not applicable" and "Health"
+    inside "Healthcare", so each end of the label that is a word character gets
+    a boundary assertion. Labels ending in punctuation, such as
+    "Other (please specify)", keep an open end.
+    """
+    pattern = re.escape(option)
+    if re.match(r"\w", option):
+        pattern = r"(?<!\w)" + pattern
+    if re.search(r"\w$", option):
+        pattern = pattern + r"(?!\w)"
+    return re.compile(pattern)
+
+
+def count_multi_select(column_data, option_list):
+    """Count how many responses selected each option of a multi-select answer.
+
+    Each option is counted at most once per response. Options are matched
+    longest first and matched text is consumed, so a label contained in a
+    longer one ("Other" within "Other (please specify)") is not double counted.
+    """
+    patterns = [(option, _option_pattern(option)) for option in option_list]
+    patterns.sort(key=lambda item: len(item[0]), reverse=True)
+
     counts = {option: 0 for option in option_list}
 
-    # Iterate over each response
-    for response in column_data:
-        for option in option_list:
-            if option in response:
+    for response in column_data.dropna():
+        remaining = str(response)
+        for option, pattern in patterns:
+            # \x00 is not a word character, so it still separates neighbours.
+            remaining, hits = pattern.subn("\x00", remaining)
+            if hits:
                 counts[option] += 1
+
+    return counts
+
+
+def create_mbar_chart(df, column_name, option_list, bar_title):
+    # Extract the relevant column
+    column_data = df[column_name]
+
+    counts = count_multi_select(column_data, option_list)
 
     # Convert the counts to a DataFrame
     df_counts = pd.DataFrame(list(counts.items()), columns=["Answer", "Count"])
