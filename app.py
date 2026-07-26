@@ -1,6 +1,4 @@
-import pandas as pd
 import streamlit as st
-from templates.chart_templates import *
 
 st.set_page_config(
     page_title="MSNA:Dashboard",
@@ -10,17 +8,6 @@ st.set_page_config(
 )
 st.title("📊MSNA Survey: Data Analysis")
 st.markdown("---")
-sheet_id = st.secrets["data_link"]
-csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
-
-
-@st.cache_data
-def load_data():
-    df = pd.read_csv(csv_url)
-    return df
-
-
-df = load_data()
 
 # PAGE_SETUP
 
